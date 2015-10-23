@@ -198,38 +198,6 @@ class Builder extends IlluminateQueryBuilder {
         return $bindings;
     }
 
-     /**
-     * Get the count of the total records for the paginator.
-     *
-     * @param  array  $columns
-     * @return int
-     */
-    public function getCountForPagination($columns = ['*'])
-    {
-        $this->backupFieldsForCount();
-
-        $this->aggregate = ['function' => 'count', 'columns' => $columns];
-
-        $results = $this->get();
-
-        $this->aggregate = null;
-
-        $this->restoreFieldsForCount();
-
-        if (isset($this->groups)) {
-            return count($results);
-        }
-
-        $row = null;
-        if ($results->offsetExists(0)) {
-            $row = $results->offsetGet(0);
-            $count = $row->offsetGet(0);
-            return $count;
-        } else {
-            return 0;
-        }
-    }
-
     /**
     * Get the count of the total records for the paginator.
     *
