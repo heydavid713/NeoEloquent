@@ -14,7 +14,7 @@
         "illuminate/support": "5.1.*",
         "illuminate/database": "5.1.*",
         "illuminate/pagination": "5.1.*",
-        "vinelab/neo4jphp": "0.1.*",
+        "heydavid713/neo4jphp": "0.1.*",
         "nesbot/carbon": "~1.0"
     },
     "require-dev": {
@@ -32,5 +32,24 @@
             "Vinelab\\NeoEloquent\\": "src/"
         }
     },
-    "minimum-stability": "stable"
+    "minimum-stability": "stable",
+    "repositories": [
+        {
+            "type": "package",
+            "package": {
+                "name": "heydavid713/neo4jphp",
+                "version": "0.1.1",
+                "source": {
+                    "url": "git://github.com/heydavid713/neo4jphp.git",
+                    "type": "git",
+                    "reference": "0.1.1"
+                },
+                "autoload": {
+                    "psr-0": {
+                        "Everyman\\neo4jphp\\": "lib/"
+                    }
+                }
+            }
+        }
+    ]
 }
