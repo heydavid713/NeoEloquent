@@ -206,6 +206,7 @@ abstract class Relation extends Delegate
 
             if (!empty($existing)) {
                 $existing->delete();
+                event('neo4j.relationship.delete');
             }
         }
 
