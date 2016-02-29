@@ -216,6 +216,7 @@ abstract class Relation extends Delegate {
 
         if ($saved)
         {
+          event('relationship.saved');
             // Let's refresh the relation we alreay have set so that
             // we make sure that it is totally in sync with the saved one.
             $this->setRelation($this->relation);
