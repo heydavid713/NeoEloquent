@@ -68,7 +68,6 @@ class Connection extends IlluminateConnection
     {
         return ClientBuilder::create()
             ->addConnection('default', 'http', $this->getHost(), $this->getPort(), $this->isSecured(), $this->getUsername(), $this->getPassword())
-            ->setAutoFormatResponse(true)
             ->build();
     }
 
