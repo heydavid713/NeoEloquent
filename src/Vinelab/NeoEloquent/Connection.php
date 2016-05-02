@@ -6,7 +6,7 @@ use Exception;
 use DateTime;
 use Closure;
 use GraphAware\Neo4j\Client\Client;
-use GraphAware\Neo4j\ClientBuilder;
+use GraphAware\Neo4j\Client\ClientBuilder;
 use Vinelab\NeoEloquent\Query\Builder;
 use Illuminate\Database\Connection as IlluminateConnection;
 use Illuminate\Database\Schema\Grammars\Grammar as IlluminateSchemaGrammar;
