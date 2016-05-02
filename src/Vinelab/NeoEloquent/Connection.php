@@ -5,7 +5,7 @@ namespace Vinelab\NeoEloquent;
 use Exception;
 use DateTime;
 use Closure;
-use GraphAware\Neo4j\Client;
+use GraphAware\Neo4j\Client\Client;
 use GraphAware\Neo4j\ClientBuilder;
 use Vinelab\NeoEloquent\Query\Builder;
 use Illuminate\Database\Connection as IlluminateConnection;
