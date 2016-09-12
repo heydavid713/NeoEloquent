@@ -7,6 +7,7 @@ use Vinelab\NeoEloquent\Connection;
 use Illuminadte\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Collection;
 use Vinelab\NeoEloquent\Query\Grammars\Grammar;
+use Vinelab\NeoEloquent\Query\Processors\Processor;
 use Illuminate\Database\Query\Builder as IlluminateQueryBuilder;
 
 class Builder extends IlluminateQueryBuilder {
@@ -225,7 +226,7 @@ class Builder extends IlluminateQueryBuilder {
             return 0;
         }
     }
-    
+
     /**
 	 * Add a basic where clause to the query.
 	 *
