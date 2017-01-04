@@ -1,9 +1,10 @@
 <?php namespace Vinelab\NeoEloquent\Tests\Query;
 
+use Illuminate\Database\Query\Processors\Processor;
 use Mockery as M;
 use Vinelab\NeoEloquent\Query\Builder;
-use Vinelab\NeoEloquent\Tests\TestCase;
 use Vinelab\NeoEloquent\Query\Grammars\CypherGrammar;
+use Vinelab\NeoEloquent\Tests\TestCase;
 
 class QueryBuilderTest extends TestCase {
 
@@ -13,11 +14,12 @@ class QueryBuilderTest extends TestCase {
 
         $this->grammar    = M::mock('Vinelab\NeoEloquent\Query\Grammars\CypherGrammar')->makePartial();
         $this->connection = M::mock('Vinelab\NeoEloquent\Connection');
+        $this->processor = new Processor;
 
         $this->neoClient = M::mock('Everyman\Neo4j\Client');
         $this->connection->shouldReceive('getClient')->once()->andReturn($this->neoClient);
 
-        $this->builder = new Builder($this->connection, $this->grammar);
+        $this->builder = new Builder($this->connection, $this->grammar, $this->processor);
     }
 
     public function tearDown()
@@ -247,62 +249,6 @@ class QueryBuilderTest extends TestCase {
         $this->assertEquals('MATCH (user:User) RETURN DISTINCT user.foo, user.bar', $builder->toCypher());
     }
 
-    public function testSelectWithCaching()
-    {
-        $cache = m::mock('stdClass');
-        $driver = m::mock('stdClass');
-        $query = $this->setupCacheTestQuery($cache, $driver);
-
-        $query = $query->remember(5);
-
-        $driver->shouldReceive('remember')
-                         ->once()
-                         ->with($query->getCacheKey(), 5, m::type('Closure'))
-                         ->andReturnUsing(function($key, $minutes, $callback) { return $callback(); });
-
-        $this->assertEquals($query->get(), array('results'));
-    }
-
-    public function testSelectWithCachingForever()
-    {
-        $cache = m::mock('stdClass');
-        $driver = m::mock('stdClass');
-        $query = $this->setupCacheTestQuery($cache, $driver);
-
-        $query = $query->rememberForever();
-
-        $driver->shouldReceive('rememberForever')
-                                                ->once()
-                                                ->with($query->getCacheKey(), m::type('Closure'))
-                                                ->andReturnUsing(function($key, $callback) { return $callback(); });
-
-
-
-        $this->assertEquals($query->get(), array('results'));
-    }
-
-    public function testSelectWithCachingAndTags()
-    {
-        $taggedCache = m::mock('StdClass');
-        $cache = m::mock('stdClass');
-        $driver = m::mock('stdClass');
-
-        $driver->shouldReceive('tags')
-                ->once()
-                ->with(array('foo','bar'))
-                ->andReturn($taggedCache);
-
-        $query = $this->setupCacheTestQuery($cache, $driver);
-        $query = $query->cacheTags(array('foo', 'bar'))->remember(5);
-
-        $taggedCache->shouldReceive('remember')
-                        ->once()
-                        ->with($query->getCacheKey(), 5, m::type('Closure'))
-                        ->andReturnUsing(function($key, $minutes, $callback) { return $callback(); });
-
-        $this->assertEquals($query->get(), array('results'));
-    }
-
     public function testAddBindingWithArrayMergesBindings()
     {
         $builder = $this->getBuilder();
@@ -369,6 +315,6 @@ class QueryBuilderTest extends TestCase {
         $connection->shouldReceive('getClient')->once()->andReturn($client);
         $grammar = new CypherGrammar;
 
-        return new Builder($connection, $grammar);
+        return new Builder($connection, $grammar, $this->processor);
     }
 }

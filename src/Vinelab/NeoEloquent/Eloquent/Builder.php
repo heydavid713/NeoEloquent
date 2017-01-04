@@ -7,8 +7,12 @@ use Vinelab\NeoEloquent\Helpers;
 use Everyman\Neo4j\Query\ResultSet;
 use Vinelab\NeoEloquent\Eloquent\Model;
 use Vinelab\NeoEloquent\QueryException;
+use Vinelab\NeoEloquent\Relations\HasOne;
+use Vinelab\NeoEloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Collection;
+use Vinelab\NeoEloquent\Relations\OneRelation;
 use Illuminate\Database\Eloquent\Builder as IlluminateBuilder;
+use Illuminate\Pagination\Paginator;
 
 class Builder extends IlluminateBuilder {
 
@@ -25,29 +29,30 @@ class Builder extends IlluminateBuilder {
     protected $mutations = array();
 
     /**
-	 * Find a model by its primary key.
-	 *
-	 * @param  mixed  $id
-	 * @param  array  $properties
-	 * @return \Illuminate\Database\Eloquent\Model|static|null
-	 */
-	public function find($id, $properties = array('*'))
-	{
-        // If the dev did not specify the $id as an int it would break
-        // so we cast it anyways.
-
-		if (is_array($id))
-		{
-		    return $this->findMany(array_map(function($id){ return (int) $id; }, $id), $properties);
-		} else {
-
-            $id = (int) $id;
+     * Find a model by its primary key.
+     *
+     * @param  mixed  $id
+     * @param  array  $properties
+     * @return \Illuminate\Database\Eloquent\Model|static|null
+     */
+    public function find($id, $properties = array('*'))
+    {
+      //If the ID is numeric we cast it to int.
+      //otherwise we leave it as it is.
+        if (is_array($id))
+        {
+            return $this->findMany(array_map(function($id){return is_numeric($id) ? (int) $id : $id;},$id), $properties);
         }
 
-		$this->query->where($this->model->getKeyName() . '('. $this->query->modelAsNode() .')', '=', $id);
+        if ($this->model->getKeyName() === 'id') {
+            // ids are treated differently in neo4j so we have to adapt the query to them.
+            $this->query->where($this->model->getKeyName() . '('. $this->query->modelAsNode() .')', '=', $id);
+        } else {
+            $this->query->where($this->model->getKeyName(), '=', $id);
+        }
 
-		return $this->first($properties);
-	}
+        return $this->first($properties);
+    }
 
     /**
      * Declare identifiers to carry over to the next part of the query.
@@ -64,23 +69,23 @@ class Builder extends IlluminateBuilder {
     }
 
     /**
-	 * Get the hydrated models without eager loading.
-	 *
-	 * @param  array  $properties
-	 * @return array|static[]
-	 */
-	public function getModels($properties = array('*'))
-	{
-		// First, we will simply get the raw results from the query builders which we
-		// can use to populate an array with Eloquent models. We will pass columns
-		// that should be selected as well, which are typically just everything.
-		$results = $this->query->get($properties);
+     * Get the hydrated models without eager loading.
+     *
+     * @param  array  $properties
+     * @return array|static[]
+     */
+    public function getModels($properties = array('*'))
+    {
+        // First, we will simply get the raw results from the query builders which we
+        // can use to populate an array with Eloquent models. We will pass columns
+        // that should be selected as well, which are typically just everything.
+        $results = $this->query->get($properties);
 
-		// Once we have the results, we can spin through them and instantiate a fresh
-		// model instance for each records we retrieved from the database. We will
-		// also set the proper connection name for the model after we create it.
+        // Once we have the results, we can spin through them and instantiate a fresh
+        // model instance for each records we retrieved from the database. We will
+        // also set the proper connection name for the model after we create it.
         return $this->resultsToModels($this->model->getConnectionName(), $results);
-	}
+    }
 
     /**
      * Turn Neo4j result set into the corresponding model
@@ -113,6 +118,51 @@ class Builder extends IlluminateBuilder {
                     $model = $this->model->newFromBuilder($attributes);
                     $model->setConnection($connection);
                     $models[] = $model;
+                }
+            }
+        }
+
+        return $models;
+    }
+
+    /**
+     * Turn Neo4j result set into the corresponding model with its relations
+     *
+     * @param  string $connection
+     * @param  \Everyman\Neo4j\Query\ResultSet $results
+     * @return array
+     */
+    protected function resultsToModelsWithRelations($connection, ResultSet $results)
+    {
+        $models = [];
+
+        if ($results->valid())
+        {
+            $grammar = $this->getQuery()->getGrammar();
+            $columns = $results->getColumns();
+
+            foreach ($results as $result)
+            {
+                $attributes = $this->getProperties($columns, $result);
+                // Now that we have the attributes, we first check for mutations
+                // and if exists, we will need to mutate the attributes accordingly.
+                if ($this->shouldMutate($attributes))
+                {
+                    foreach ($attributes as $identifier => $values)
+                    {
+                        $cropped = $grammar->cropLabelIdentifier($identifier);
+
+                        if (! isset($models[$cropped])) $models[$cropped] = [];
+
+                        if(isset($this->mutations[$cropped]))
+                        {
+                            $mutationModel = $this->getMutationModel($cropped);
+                            $model = $mutationModel->newFromBuilder($values);
+                            $model->setConnection($mutationModel->getConnectionName());
+
+                            $models[$cropped][] = $model;
+                        }
+                    }
                 }
             }
         }
@@ -225,10 +275,16 @@ class Builder extends IlluminateBuilder {
      *
      * @param  array  $attributes
      * @return boolean
+     *
      */
     public function shouldMutate(array $attributes)
     {
-        $intersect = array_intersect_key($attributes, $this->mutations);
+        $grammar = $this->getQuery()->getGrammar();
+        $attributes = array_map([$grammar, 'cropLabelIdentifier'], array_keys($attributes));
+        $mutations = array_keys($this->mutations);
+
+        $intersect = array_intersect($attributes, $mutations);
+
         return ! empty($intersect);
     }
 
@@ -322,7 +378,7 @@ class Builder extends IlluminateBuilder {
         // Add the node id to the attributes since \Everyman\Neo4j\Node
         // does not consider it to be a property, it is treated differently
         // and available through the getId() method.
-        $attributes[$this->model->getKeyName()] = $node->getId();
+        $attributes['id'] = $node->getId();
 
         return $attributes;
     }
@@ -396,27 +452,29 @@ class Builder extends IlluminateBuilder {
         return $this;
     }
 
+
     /**
      * Get a paginator only supporting simple next and previous links.
      *
      * This is more efficient on larger data-sets, etc.
      *
-     * @param  \Illuminate\Pagination\Factory  $paginator
-     * @param  int    $perPage
-     * @param  array  $columns
+     * @param  int $perPage
+     * @param  array $columns
+     * @param string $pageName
+     * @param null $page
      * @return \Illuminate\Pagination\Paginator
+     * @internal param \Illuminate\Pagination\Factory $paginator
      */
-    public function simplePaginate($perPage = null, $columns = array('*'))
+    public function simplePaginate($perPage = null, $columns = array('*'), $pageName = 'page', $page = null)
     {
         $paginator = $this->query->getConnection()->getPaginator();
-
         $page = $paginator->getCurrentPage();
-
         $perPage = $perPage ?: $this->model->getPerPage();
-
         $this->query->skip(($page - 1) * $perPage)->take($perPage + 1);
-
-        return $paginator->make($this->get($columns)->all(), $perPage);
+        return new Paginator($this->get($columns), $perPage, $page, [
+            'path' => Paginator::resolveCurrentPath(),
+            'pageName' => $pageName,
+        ]);
     }
 
     /**
@@ -628,11 +686,11 @@ class Builder extends IlluminateBuilder {
         $method = $this->getMatchMethodName($relation);
 
         $this->$method($relation->getParent(),
-                        $relation->getRelated(),
-                        $relatedNode,
-                        $relation->getForeignKey(),
-                        $relation->getLocalKey(),
-                        $relation->getParentLocalKeyValue());
+            $relation->getRelated(),
+            $relatedNode,
+            $relation->getForeignKey(),
+            $relation->getLocalKey(),
+            $relation->getParentLocalKeyValue());
 
         // Prefix all the columns with the relation's node placeholder in the query
         // and merge the queries that needs to be merged.
@@ -724,14 +782,14 @@ class Builder extends IlluminateBuilder {
                 // accordingly, which guarantees sending an Eloquent result straight in would work.
                 elseif ($value instanceof Collection)
                 {
-                    $attach = array_merge($attach, $value->lists('id'));
+                    $attach = array_merge($attach, $value->lists('id')->toArray());
                 }
                 // Or in the case where the attributes are neither an array nor a model instance
                 // then this is assumed to be the model Id that the dev means to attach and since
                 // Neo4j node Ids are always an int then we take that as a value.
                 elseif ( ! is_array($value) && ! $value instanceof Model)
                 {
-                    $attach[] = intval($value);
+                    $attach[] = $value;
                 }
                 // In this case the record is considered to be new to the market so let's create it.
                 else $create[] = $this->prepareForCreation($relatedModel, $value);
@@ -742,9 +800,9 @@ class Builder extends IlluminateBuilder {
         }
 
         $result = $this->query->createWith($model, $related);
+        $models = $this->resultsToModelsWithRelations($this->model->getConnectionName(), $result);
 
-       $models = $this->resultsToModels($this->model->getConnectionName(), $result);
-       return ( ! empty($models)) ? reset($models) : null;
+        return ( ! empty($models)) ? $models : null;
     }
 
     /**

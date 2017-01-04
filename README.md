@@ -27,10 +27,52 @@ Add the package to your `composer.json` and run `composer update`.
 
 ### Laravel 5
 
+#### 5.3
+
+```json
+{
+    "require": {
+        "vinelab/neoeloquent": "1.4.*"
+    }
+}
+```
+
+#### 5.2
+
+```json
+{
+    "require": {
+        "vinelab/neoeloquent": "1.4.*"
+    }
+}
+```
+
+#### 5.2
+
+```json
+{
+    "require": {
+        "vinelab/neoeloquent": "1.3.*"
+    }
+}
+```
+
+#### 5.1
+
 ```json
 {
     "require": {
         "vinelab/neoeloquent": "1.2.*"
+    }
+}
+```
+
+#### 5.0
+
+```json
+{
+    "require": {
+        "vinelab/neoeloquent": "1.2.5"
     }
 }
 ```
@@ -759,7 +801,7 @@ $edge = $location->user()->edge();
 
 You may also specify the model at the other side of the edge.
 
-> Note: By default NeoEloquent will try to pefrorm the `$location->user` internally to figure
+> Note: By default NeoEloquent will try to perform the `$location->user` internally to figure
 out the related side of the edge based on the relation function name, in this case it's
 `user()`.
 
@@ -919,8 +961,8 @@ NeoEloquent introduces new commands under the `neo4j` namespace so you can still
 
 Migration commands are the same as those of Eloquent, in the form of `neo4j:migrate[:command]`
 
+    neo4j:make:migration                 Create a new migration file
     neo4j:migrate                        Run the database migrations
-    neo4j:migrate:make                   Create a new migration file
     neo4j:migrate:reset                  Rollback all database migrations
     neo4j:migrate:refresh                Reset and re-run all migrations
     neo4j:migrate:rollback               Rollback the last database migration

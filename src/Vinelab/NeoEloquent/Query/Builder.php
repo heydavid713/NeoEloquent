@@ -7,6 +7,8 @@ use Vinelab\NeoEloquent\Connection;
 use Illuminadte\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Collection;
 use Vinelab\NeoEloquent\Query\Grammars\Grammar;
+use Vinelab\NeoEloquent\Query\Processors\Processor;
+use Illuminate\Database\Query\Processors\Processor as IlluminateProcessor;
 use Illuminate\Database\Query\Builder as IlluminateQueryBuilder;
 
 class Builder extends IlluminateQueryBuilder {
@@ -71,12 +73,15 @@ class Builder extends IlluminateQueryBuilder {
      * Create a new query builder instance.
      *
      * @param Vinelab\NeoEloquent\Connection $connection
+     * @param  \Illuminate\Database\Query\Grammars\Grammar  $grammar
+     * @param  \Illuminate\Database\Query\Processors\Processor  $processor
      * @return void
      */
-    public function __construct(Connection $connection, Grammar $grammar)
+    public function __construct(Connection $connection, Grammar $grammar, IlluminateProcessor $processor)
     {
         $this->grammar = $grammar;
         $this->grammar->setQuery($this);
+        $this->processor = $processor;
 
         $this->connection = $connection;
 
@@ -192,6 +197,38 @@ class Builder extends IlluminateQueryBuilder {
         }
 
         return $bindings;
+    }
+
+    /**
+    * Get the count of the total records for the paginator.
+    *
+    * @param  array  $columns
+    * @return int
+     */
+    public function getCountForPagination($columns = ['*'])
+    {
+        $this->backupFieldsForCount();
+
+        $this->aggregate = ['function' => 'count', 'columns' => $columns];
+
+        $results = $this->get();
+
+        $this->aggregate = null;
+
+        $this->restoreFieldsForCount();
+
+        if (isset($this->groups)) {
+            return count($results);
+        }
+
+        $row = null;
+        if ($results->offsetExists(0)) {
+                $row = $results->offsetGet(0);
+                $count = $row->offsetGet(0);
+                return $count;
+        } else {
+                return 0;
+        }
     }
 
     /**
@@ -331,7 +368,7 @@ class Builder extends IlluminateQueryBuilder {
     {
         if (is_array($this->wheres))
             return count(array_filter($this->wheres, function($where) use($column) {
-                return $where['column'] == $column;
+                return isset($where['column']) && $where['column'] == $column;
             }));
     }
 
@@ -508,8 +545,7 @@ class Builder extends IlluminateQueryBuilder {
         $cypher = $this->grammar->compileCreateWith($this, compact('model', 'related'));
 
         // Indicate that we need the result returned as is.
-        $result = true;
-        return $this->connection->statement($cypher, [], $result);
+        return $this->connection->statement($cypher, [], true);
     }
 
     /**
@@ -821,7 +857,7 @@ class Builder extends IlluminateQueryBuilder {
 	 */
 	public function newQuery()
 	{
-		return new Builder($this->connection, $this->grammar);
+		return new Builder($this->connection, $this->grammar, $this->getProcessor());
 	}
 
     /**
@@ -857,5 +893,26 @@ class Builder extends IlluminateQueryBuilder {
         $updated = $this->connection->update($cypher, $this->getBindings());
 
         return (isset($updated[0]) && isset($updated[0][0])) ? $updated[0][0] : 0;
+    }
+
+    /**
+     * Execute the query as a "select" statement.
+     *
+     * @param  array  $columns
+     * @return \Illuminate\Support\Collection
+     */
+    public function get($columns = ['*'])
+    {
+        $original = $this->columns;
+
+        if (is_null($original)) {
+            $this->columns = $columns;
+        }
+
+        $results = $this->processor->processSelect($this, $this->runSelect());
+
+        $this->columns = $original;
+
+        return $results;
     }
 }

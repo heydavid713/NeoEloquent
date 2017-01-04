@@ -47,7 +47,7 @@ class DatabaseMigrationRepository implements MigrationRepositoryInterface {
      */
     public function getRan()
     {
-        return $this->model->all()->lists('migration');
+        return $this->model->all()->lists('migration')->toArray();
     }
 
     /**
@@ -184,6 +184,18 @@ class DatabaseMigrationRepository implements MigrationRepositoryInterface {
     public function getMigrationModel()
     {
         return $this->model;
+    }
+
+    /**
+     * Get list of migrations.
+     *
+     * @param  int $steps
+     * @return array
+     */
+    public function getMigrations($steps)
+    {
+        $query = $this->label()->where('batch', '>=', '1');
+        return $query->orderBy('migration', 'desc')->take($steps)->get()->all();
     }
 
 }

@@ -1,8 +1,10 @@
 <?php namespace Vinelab\NeoEloquent;
 
+use Exception;
 use DateTime, Closure;
 use Everyman\Neo4j\Query\ResultSet;
 use Vinelab\NeoEloquent\Query\Builder;
+use Vinelab\NeoEloquent\Query\Processors\Processor;
 use Vinelab\NeoEloquent\QueryException;
 use Everyman\Neo4j\Client as NeoClient;
 use Everyman\Neo4j\Cypher\Query as CypherQuery;
@@ -45,6 +47,13 @@ class Connection extends IlluminateConnection {
     protected $driverName = 'neo4j';
 
     /**
+     * The query post processor implementation.
+     *
+     * @var \Illuminate\Database\Query\Processors\Processor
+     */
+    protected $postProcessor;
+
+    /**
      * Create a new database connection instance
      *
      * @param array $config The database connection configuration
@@ -55,6 +64,13 @@ class Connection extends IlluminateConnection {
 
         // activate and set the database client connection
         $this->neo = $this->createConnection();
+
+        // We need to initialize a query grammar and the query post processors
+        // which are both very important parts of the database abstractions
+        // so we initialize these to their default values while starting.
+        $this->useDefaultQueryGrammar();
+
+        $this->useDefaultPostProcessor();
     }
 
     /**
@@ -404,7 +420,7 @@ class Connection extends IlluminateConnection {
      */
     public function table($table)
     {
-        $query = new Builder($this, $this->getQueryGrammar());
+        $query = new Builder($this, $this->getQueryGrammar(), $this->getPostProcessor());
 
         return $query->from($table);
     }
@@ -434,7 +450,7 @@ class Connection extends IlluminateConnection {
             // If an exception occurs when attempting to run a query, we'll format the error
             // message to include the bindings with Cypher, which will make this exception a
             // lot more helpful to the developer instead of just the database's errors.
-        catch (\Exception $e)
+        catch (Exception $e)
         {
             throw new QueryException($query, $bindings, $e);
         }
@@ -489,5 +505,20 @@ class Connection extends IlluminateConnection {
         }
 
         return new Schema\Builder($this);
+    }
+
+     /**
+     * Get the last Id created by Neo4J
+     *
+     * @return int
+     */
+    public function lastInsertedId()
+    {
+        $query = "MATCH (n) RETURN MAX(id(n)) AS lastIdCreated";
+
+        $statement = $this->getCypherQuery($query, []);
+        $result = $statement->getResultSet();
+
+        return $result[0][0];
     }
 }

@@ -5,7 +5,7 @@ use Carbon\Carbon;
 use Mockery as M;
 use Vinelab\NeoEloquent\Tests\TestCase;
 use Vinelab\NeoEloquent\Eloquent\Model;
-use Vinelab\NeoEloquent\Eloquent\SoftDeletingTrait;
+use Vinelab\NeoEloquent\Eloquent\SoftDeletes;
 
 class Wiz extends Model {
 
@@ -16,7 +16,7 @@ class Wiz extends Model {
 
 class WizDel extends Model {
 
-    use SoftDeletingTrait;
+    use SoftDeletes;
 
     protected $dates = ['deleted_at'];
 
@@ -64,10 +64,10 @@ class SimpleCRUDTest extends TestCase {
         $u = User::create([]);
         $id = (string) $u->id;
         $found = User::where('id', "$id")->first();
-        $this->assertEquals($found, $u);
+        $this->assertEquals($found->toArray(), $u->toArray());
 
         $foundAgain = User::where('id(individual)', "$id")->first();
-        $this->assertEquals($foundAgain, $u);
+        $this->assertEquals($foundAgain->toArray(), $u->toArray());
     }
 
     public function testCreatingRecord()
@@ -93,7 +93,7 @@ class SimpleCRUDTest extends TestCase {
         $this->assertInstanceOf('Vinelab\NeoEloquent\Tests\Functional\Wiz', $w);
 
         $w2 = Wiz::find($w->id);
-        $this->assertEquals($w, $w2);
+        $this->assertEquals($w->toArray(), $w2->toArray());
     }
 
     /**
@@ -316,7 +316,7 @@ class SimpleCRUDTest extends TestCase {
             'triz' => 'troo'
         ]);
 
-        $this->assertEquals($w, $found);
+        $this->assertEquals($w->toArray(), $found->toArray());
     }
 
     public function testCreatingNullAndBooleanValues()
